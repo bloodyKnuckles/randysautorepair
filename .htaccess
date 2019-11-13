@@ -1,0 +1,10 @@
+RewriteEngine On
+
+#RewriteRule ^(.*)$ http://archive.org [L]
+
+RewriteRule ^(events_[0-9]{14}.*\.html)$ index.cgi?page=$1 [L]
+RewriteRule ^(articles_[0-9]{14}.*\.html)$ index.cgi?page=$1 [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*\.html)$ index.cgi?page=pages_$1 [L]
+

@@ -1,0 +1,96 @@
+body
+{
+	font-family: lucinda, sans serif;
+	font-size: 14px;
+	margin: 0px;
+	padding: 0px;
+}
+
+a
+{
+	text-decoration: none;
+}
+
+ul
+{
+	list-style-type: none;
+	/*list-style-image: url(images/tilde.gif);*/
+	list-style-position: inside;
+	margin: 5px 0px 10px 0px;
+	padding: 0px 0px 0px 10px;
+}
+
+#leftside
+{
+	/*position: fixed;*/
+	float: left;
+	width: 250px;
+	height: 100%;
+	border-style: solid;
+	border-color: #999999;
+	border-width: 0px 1px 1px 0px;
+}
+
+#logo
+{
+	padding: 10px;
+	align: center;
+}
+
+#navigation
+{
+	height: 100%;
+	margin: 0px;
+	padding: 10px 10px 5px 10px;
+	background-color: #F0F0F0;
+	border-style: solid;
+	border-color: #999999;
+	border-width: 1px 0px 0px 0px;
+}
+
+.pagescategory
+{
+	font-family: courier;
+	font-size: 12px;
+	font-weight: bold;
+	font-style: none;
+	color: #666666;
+}
+
+.eventscategory
+{
+	font-family: courier;
+	font-size: 12px;
+	font-weight: bold;
+	font-style: none;
+	color: #666666;
+}
+
+.articlescategory
+{
+	font-family: courier;
+	font-size: 12px;
+	font-weight: bold;
+	font-style: none;
+	color: #666666;
+}
+
+#contentarea
+{
+	position: absolute;
+	left: 250px;
+	width: 450px;
+	margin: 10px 0px 0px 10px;
+}
+
+#footer
+{
+
+}
+
+.greeting
+{
+	font-weight: bold;
+	color: maroon;
+}
+

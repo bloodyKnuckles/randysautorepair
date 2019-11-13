@@ -1,0 +1,1130 @@
+#!/usr/bin/perl -w
+
+use strict;
+use CGI qw( :standard );
+
+# DISPLAY ERROR MESSAGES
+#BEGIN { $| = 1; open STDERR, ">&STDOUT"; print qq~Content-type: text/html\n\n~; our $content_type = 1; }
+
+# GET EDIT VAR
+my $edit = "pages";
+if ( defined(param( "edit" )) 
+  && "" ne param( "edit" )
+) { $edit = param( "edit" ); }
+my @months = ("", "Jan.", "Feb.", "Mar.", "Apr.", "May"
+  , "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."
+);
+my @months_full = ("", "January", "February", "March", "April", "May"
+  , "June", "July", "August", "September", "October", "November", "December"
+);
+my $now_date = `date +'%Y%m%d%H%M%S'`;
+chomp $now_date;
+my $now_month = `date +'%m'`;
+chomp $now_month;
+my $now_day = `date +'%d'`;
+chomp $now_day;
+my $now_year = `date +'%Y'`;
+chomp $now_year;
+my $now_hours = `date +'%H'`;
+chomp $now_hours;
+my $now_minutes = `date +'%M'`;
+chomp $now_minutes;
+
+print qq~Content-type: text/html
+
+<div class="pages" id="pages_1">
+Edit:
+  <ul>
+    <li><a class="pagelink" href="admin.cgi?edit=articles">Articles</a></li>
+    <li><a class="pagelink" href="admin.cgi?edit=events">Events</a></li>
+    <li><a class="pagelink" href="admin.cgi?edit=pages">Pages</a></li>
+  </ul>
+</div>
+
+~;
+
+
+
+
+
+
+
+# ARTICLES
+if ( "articles" eq $edit ) {
+
+  # PROCESS ARTICLE FORM
+  if ( defined(param( "submit_action" ))
+    && defined(param( "article_filename" ))
+    && "" ne param( "article_filename" )
+    && defined(param( "article_label" ))
+    && "" ne param( "article_label" )
+    && defined(param( "article" ))
+  ) {
+
+    my $article_label = param( "article_label" );
+    my $article_date = param( "article_year" ) . param( "article_month" );
+    $article_date .= param( "article_day" ) . param( "article_hours" );
+    $article_date .= param( "article_minutes" ) . "00";
+    my $article_filename = param( "article_filename" );
+
+    # ARCHIVE OLD ARTICLE FILE
+    if ( $article_filename =~ /^articles_.+/ ) {
+      use File::Copy;
+      copy $article_filename, $article_filename . ".bak";
+      unlink $article_filename;
+    }
+
+    # REWRITE ARTICLE FILENAME
+    if ( "Save Article" eq param( "submit_action" ) ) {
+      $article_filename = $article_label;
+      $article_filename =~ s/ +/_/g;
+      $article_filename =~ s/\W//g;
+      $article_filename =~ s/(.+)/\L$1/;
+      $article_filename = "articles_" . $article_date . "_" . $article_filename . ".html";
+      my $article = param( "article" );
+      $article =~ s/\r\n/<br \/>\n/g;
+
+      open ARTICLE, ">$article_filename" or die "Can't open ARTICLE $article_filename $!";
+      print ARTICLE "<!-- ", $article_label, " -->\n\n";
+      print ARTICLE $article;
+      close ARTICLE;
+    }
+  }
+
+  # GET ARTICLES
+  opendir ARTICLES, "." or die "Can't open ARTICLES $!";
+  my @articles = grep { /^articles_\d{14}.*\.html(?!\.bak)/  } readdir ARTICLES;
+  closedir ARTICLES;
+
+  my @articles_info = ();
+  foreach ( @articles ) {
+    open ARTICLE, "./$_" or die "Can't open ARTICLE $_ $!";
+
+    # GET ARTICLE LABEL
+    my $article_label = <ARTICLE>;
+    chomp $article_label;
+    $article_label =~ s/(^<!-- | -->)//g;
+
+    close ARTICLE;
+
+    # GET ARTICLE PUBLISH DATE
+    my $article_date = $_;
+    chomp $article_date;
+    $article_date =~ s/^.*(\d{14}).*$/$1/g;
+
+    push @articles_info, [$_, $article_label, $article_date]; 
+  }
+
+  print "Articles:";
+  print qq~&nbsp;&nbsp;<a href="admin.cgi?edit=articles_">New...</a>\n~;
+  print "  <ul>\n";
+  foreach ( sort { @{$b}[2] <=> @{$a}[2] } @articles_info ) {
+
+    # PRINT ARTICLES
+    print "    <li>", $months[(substr(${$_}[2], 4, 2) + 0)];
+    print " ", substr(${$_}[2], 6, 2);
+    print ", ", substr(${$_}[2], 0, 4);
+    print qq~ <a href="admin.cgi?edit=~, ${$_}[0], qq~">~, ${$_}[1] , "</a></li>\n";
+  }
+  print "  </ul>\n";
+}
+
+
+
+
+
+
+
+
+# EDIT ARTICLE
+elsif ( $edit =~ /^articles_((\d{14})_.*\.html)?/ ) {
+
+  print qq~<a href="admin.cgi?edit=articles">Articles</a>~;
+  print "&nbsp;&#62;&nbsp;";
+  my $edit_article = 0;
+  if ( defined($1) && "" ne $1 ) {
+    $edit_article = 1;
+    print "Edit";
+  }
+  else { print "New"; }
+  print " Article:\n";
+
+  my $article_label = "";
+  my $article_date = "";
+  my $article_month = "00";
+  my $article_day = "00";
+  my $article_year = "00";
+  my $article_hours = "00";
+  my $article_minutes = "00";
+
+  if ( 1 == $edit_article ) {
+
+    # GET ARTICLE PUBLISH DATE
+    my $article_date = $2;
+    $article_year = substr($article_date, 0, 4);
+    $article_month = substr($article_date, 4, 2);
+    $article_day = substr($article_date, 6, 2);
+    $article_hours = substr($article_date, 8, 2);
+    $article_minutes = substr($article_date, 10, 2);
+
+    open ARTICLE, $edit or die "Can't open ARTICLE $edit $!";
+
+    # GET ARTICLE LABEL
+    $article_label = <ARTICLE>;
+    chomp $article_label;
+    $article_label =~ s/^<!-- | -->//g;
+
+    my $dump = <ARTICLE>; # skip extra line
+  }
+
+  print qq~<form name="editarticle" action="admin.cgi" method="post"
+             onSubmit="if ( document.forms.editarticle.article_label.value == ''
+             ) { alert('Please enter an Article Link Label.'); 
+             document.forms.editarticle.article_label.focus();
+             return false; } else { return true; }"
+           >\n~;
+  print qq~<input type="hidden" name="article_filename" value="$edit" />\n~;
+  print qq~<input type="hidden" name="edit" value="articles" />\n~;
+
+  # ARTICLE PUBLISH DATE
+  print "<p>\n";
+  print "Article Publish Date:<br />";
+  print qq~<select name="article_month">\n~;
+  for (my $i = 1; $i < 13; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $article_month && $article_month == $i) 
+      || (0 == $article_month && $now_month == $i) 
+    ) { print " selected"; }
+    print ">" . $months[$i] . "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="article_day">\n~;
+  for (my $i = 1; $i < 32; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $article_day && $article_day == $i) 
+      || (0 == $article_day && $now_day == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="article_year">\n~;
+  for (my $i = ($now_year - 1); $i < $now_year + 4; $i++ ) {
+    print qq~<option value="$i"~;
+    if ( (0 < $article_year && $article_year == $i) 
+      || (0 == $article_year && $now_year == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~&nbsp;&nbsp;Time: (optional) <select name="article_hours">\n~;
+  print qq~<option value="00">Midnight</option>~;
+  for (my $i = 1; $i < 24; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( 0 < $article_hours && $article_hours == $i ) { print " selected"; }
+    print ">";
+    if ( 12 == $i ) { print "Noon"; }
+    elsif ( 13 > $i  ) { print "$i am"; }
+    else { print $i - 12, " pm"; }
+    print "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~:<select name="article_minutes">\n~;
+  print qq~<option value="00">00</option>~;
+  for (my $i = 15; $i < 46; $i += 15 ) {
+    print qq~<option value="$i"~;
+    if ( 0 < $article_minutes && $article_minutes == $i ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+
+  # ARTICLE LABEL
+  print "<p>\n";
+  print "Article Link Label:<br />";
+  print qq~<input type="text" name="article_label" size="60" value="~;
+  print $article_label;
+  print qq~" />\n~;
+  print "</p>\n";
+
+  # GET ARTICLE
+  print "<p>\n";
+  print "Article:<br />";
+  print qq~<textarea name="article" cols="60" rows="15">\n~;
+  if ( 1 == $edit_article ) {
+    while(<ARTICLE>) {
+      $_ =~ s/<br \/>//;
+      print $_;
+    }
+  }
+  print "</textarea>\n";
+  print "</p>\n";
+
+  # SUBMIT BUTTON
+  print "<p>\n";
+  print qq~<input type="submit" name="submit_action" value="Save Article" />\n~;
+  print qq~&nbsp;<input type="submit" name="submit_action" value="DELETE Article" onClick="return confirm('You are about to DELETE this article.');" />\n~ if 1 == $edit_article;
+  print "</p>\n";
+
+  close ARTICLE if 1 == $edit_article;
+  print "</form>\n";
+}
+
+
+
+
+
+
+
+# EVENTS
+elsif ( "events" eq $edit ) {
+
+  #use Date::Calc qw/Add_Delta_Days Date_to_Text_Long Day_of_Week Days_in_Month/;
+  use Date::Calc qw/Day_of_Week Days_in_Month/;
+
+  my $cm = $now_month;
+  my $cy = $now_year;
+  chomp ( $cy = `date +'%Y'` );
+  if ( defined(param( "cm" )) ) {
+    $cm = param( "cm" );
+    $cy = param( "cy" );
+  }
+  if ( 10 > $cm && 1 == length($cm) ) { $cm = "0" . $cm; }
+  my $d = (Day_of_Week($cy,$cm,1) + 1);
+  if ( 8 == $d ) { $d = 1; }
+  my $c = 1;
+
+
+
+  # PROCESS EVENT FORM
+  if ( defined(param( "submit_action" ))
+    && defined(param( "event_filename" ))
+    && "" ne param( "event_filename" )
+    && defined(param( "event_label" ))
+    && "" ne param( "event_label" )
+    && defined(param( "event" ))
+  ) {
+
+    my $event_label = param( "event_label" );
+    my $event_date = param( "event_year" ) . param( "event_month" );
+    $event_date .= param( "event_day" ) . param( "event_hours" );
+    $event_date .= param( "event_minutes" ) . "00";
+    my $event_filename = param( "event_filename" );
+
+    # ARCHIVE OLD EVENT FILE
+    if ( $event_filename =~ /^events_.+/ ) {
+      use File::Copy;
+      copy $event_filename, $event_filename . ".bak";
+      unlink $event_filename;
+    }
+
+    # REWRITE EVENT FILENAME
+    if ( "Save Event" eq param( "submit_action" ) ) {
+      $event_filename = $event_label;
+      $event_filename =~ s/ +/_/g;
+      $event_filename =~ s/\W//g;
+      $event_filename =~ s/(.+)/\L$1/;
+      $event_filename = "events_" . $event_date . "_" . $event_filename . ".html";
+      my $event = param( "event" );
+      $event =~ s/\r\n/<br \/>\n/g;
+
+      open EVENT, ">$event_filename" or die "Can't open EVENT $event_filename $!";
+      print EVENT "<!-- ", $event_label, " -->\n\n";
+      print EVENT $event;
+      close EVENT;
+    }
+  }
+
+
+  # GET EVENTS
+  opendir EVENTS, "." or die "Can't open EVENTS $!";
+  my @events = grep { /^events_$cy$cm\d{8}.*\.html(?!\.bak)/  } readdir EVENTS;
+  closedir EVENTS;
+
+  my @events_info = ();
+  foreach ( @events ) {
+    open EVENT, "./$_" or die "Can't open EVENT $_ $!";
+
+    # GET EVENT LABEL
+    my $event_label = <EVENT>;
+    chomp $event_label;
+    $event_label =~ s/(^<!-- | -->)//g;
+
+    close EVENT;
+
+    # GET EVENT PUBLISH DATE
+    my $event_date = $_;
+    chomp $event_date;
+    $event_date =~ s/^.*(\d{14}).*$/$1/g;
+
+    push @events_info, [$_, $event_label, $event_date]; 
+  }
+
+  print "Events:";
+  print qq~&nbsp;&nbsp;<a href="admin.cgi?edit=events_&cy=$cy&cm=$cm&c=$c&d=$d">New...</a>\n~;
+  #print "  <ul>\n";
+  #foreach ( sort { @{$b}[2] <=> @{$a}[2] } @events_info ) {
+
+    # PRINT EVENTS
+  #  print "    <li>", $months[(substr(${$_}[2], 4, 2) + 0)];
+  #  print " ", substr(${$_}[2], 6, 2);
+  #  print ", ", substr(${$_}[2], 0, 4);
+  #  print qq~ <a href="admin.cgi?edit=~, ${$_}[0], qq~">~, ${$_}[1] , "</a></li>\n";
+  #}
+  #print "  </ul>\n";
+
+
+  my %dates = ();
+  foreach ( sort { @{$b}[2] <=> @{$a}[2] } @events_info ) {
+    push @{ $dates{ (substr(${$_}[2], 6, 2) + 0) } }
+      , [${$_}[0], ${$_}[1], ${$_}[2], "", "", ""];
+  }
+
+  print qq~<form name="calnav">\n~;
+  print qq~<div align="center">~;
+  print qq~<a href="admin.cgi?edit=events&cy=$now_year&cm=$now_month&c=$now_day">~;
+  print "Today is " , $months[$now_month] . " $now_day, $now_year</a></div>";
+
+  print qq~<p align="center">~;
+  print $months_full[$cm] . "<br />";
+
+  # HEADER
+  print "<a href=\"admin.cgi?edit=events&cm=";
+  if ( 0 == ($cm - 1) ) {
+    print "12&cy=" . ($cy - 1);
+  }
+  else {
+    if ( 10 > ($cm - 1) ) { print "0"; }
+    print "" . ($cm - 1) . "&cy=".$cy;
+  }
+  print "\">";
+  print "&lt;";
+  print "</a>";
+  print "&nbsp;&nbsp;";
+  print "<select name=\"cm\"";
+  print " onChange=\"document.location='admin.cgi";
+  print "?edit=events&cm=' + this.options[this.selectedIndex].value";
+  print " + '&cy=' + document.forms.calnav.cy.options[";
+  print "document.forms.calnav.cy.selectedIndex].value";
+  print ";\"";
+  print ">\n";
+  my $i = 0;
+  for ( $i = 1; $i < 13; $i++ ) {
+    print "  <option value=\"";
+    if ( 10 > $i ) { print "0"; }
+    print $i."\"";
+    if ( $i == $cm ) {
+      print " selected"; 
+    }
+    print ">";
+    print $months[$i];
+    print "</option>\n";
+  }
+  print "</select>\n";
+  print "<select name=\"cy\"";
+  print " onChange=\"document.location='admin.cgi";
+  print "?edit=events&cm=' + document.forms.calnav.cm.options[";
+  print "document.forms.calnav.cm.selectedIndex].value";
+  print " + '&cy=' + this.options[this.selectedIndex].value";
+  print ";\"";
+  print ">\n";
+  for ( $i = ($now_year - 4); $i < $now_year + 6; $i++ ) {
+    print "  <option value=\"".$i."\"";
+    if ( $i == $cy ) {
+      print " selected"; 
+    }
+    print ">";
+    print $i;
+    print "</option>\n";
+  }
+  print "</select>\n";
+  print "&nbsp;&nbsp;";
+  print "<a href=\"admin.cgi?edit=events&cm=";
+  if ( 13 == ($cm + 1) ) {
+    print "1&cy=" . ($cy + 1);
+  }
+  else {
+    if ( 10 > ($cm + 1) ) { print "0"; }
+    print "" . ($cm + 1)."&cy=".$cy;
+  }
+  print "\">";
+  print "&gt;";
+  print "</a>";
+  print "</p>";
+  print "</form>\n";
+
+  # DISPLAY CALENDAR
+  print "<table class=\"calendar\" border=\"1\" align=\"center\"";
+  print " style=\"font-family: arial, sans serif; font-size: 12px;\"";
+  print " width=\"90%\" cellspacing=\"0\" bordercolor=\"silver\">\n";
+
+
+  # DAYS
+  print "  <tr>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Sun";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Mon";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Tue";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Wed";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Thu";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Fri";
+  print "</td>\n";
+  print "    <td class=\"calenderday\" style=\"color: gray;\"";
+  print " width=\"14%\">\n";
+  print "Sat";
+  print "</td>\n";
+  print "  </tr>\n";
+
+  # DISPLAY CALENDAR BODY
+  my $ii = 1;
+  my $rowcolor = "#F0F0F0";
+  my $cd = Days_in_Month($cy,$cm);
+  while ( $c <= $cd ) {
+    if ( $ii++ % 2 == 0 ) { $rowcolor = "#E0E0E0"; }
+    else { $rowcolor = "#F0F0F0"; }
+    print "  <tr bgcolor=\"".$rowcolor."\">\n";
+    my $wk = 0;
+    for ( $i = 1; $i < 8; $i++ ) {
+
+      print "    <td class=\"calenderdate\"";
+
+      if ( $cm == $now_month && $cy == $now_year && $c == $now_day ) {
+        print " bgcolor=\"#FFCCCC\"";
+      }
+      print " align=\"right\" valign=\"top\">\n";
+      if ( $d == $i || ($c > 1 && $c <= $cd) ) {
+        $d = 0;
+
+        my @todays_appointments = ();
+        if ( defined($dates{$c}) ) {
+          push @todays_appointments, @{ $dates{$c} };
+        }
+        my @sorted = sort { ${$a}[2] <=> ${$b}[2] } @todays_appointments;
+
+
+        print "<nobr>";
+        print "<strong style=\"font-size: medium;\">\n";
+        print $c;
+        print "</strong></nobr><br>\n";
+        print "<div align=\"left\" style=\"font-size: x-small;\">\n";
+
+        if ( 0 < @sorted ) {
+          print "<table cellpadding=\"0\" cellspacing=\"0\"";
+          print " border=\"0\">\n";
+          foreach my $array ( @sorted ) {
+            my $app_hour = (substr(@{$array}[2], 8, 2) + 0);
+            my $app_min = substr(@{$array}[2], 10, 2);
+            my $app_m = "am";
+            if ( 0 == $app_hour ) {
+              $app_hour = "";
+            }
+            elsif ( 12 < $app_hour ) {
+              $app_hour -= 12;
+              $app_m = "pm";
+            }
+            print "  <tr>\n";
+            print "    <td";
+            print " align=\"right\" valign=\"top\"";
+            print " style=\"font-size: small;\">\n";
+            if ( "" ne $app_hour ) {
+              print "<nobr>";
+              print "$app_hour:$app_min";
+              print "</nobr><br>$app_m";
+            }
+            print "</td>\n    <td>&nbsp;</td>\n    <td";
+            if ( "" ne @{$array}[5] ) {
+              print " bgcolor=\"";
+              print @{$array}[5] . "\"";
+            }
+            print " valign=\"top\" style=\"font-size: small;\">\n";
+            print " <a href=\"admin.cgi?edit=@{$array}[0]";
+            print "&cm=$cm&c=";
+            if ( 10 > $c && 1 == length($c) ) { print "0"; }
+            print "$c&cy=$cy&d=$i\"";
+            print " alt=\"@{$array}[1]\"";
+            if ( "" ne @{$array}[4] ) { print " title=\"@{$array}[4]\""; }
+            print ">";
+            print @{$array}[1];
+            print "</a><br>\n";
+            print @{$array}[3];
+            print "</td>\n  </tr>";
+          }
+          print "</table>";
+        }
+        else {
+          print "<br><br><br><br><br><br><br>\n";
+        }
+        print "</span>\n";
+        $c++;
+      }
+      print "</td>\n";
+    }
+    print "  </tr>\n";
+  }
+
+  print "</table><br /><br />\n";
+
+
+
+}
+
+
+
+
+
+
+
+# EDIT EVENT
+elsif ( $edit =~ /^events_((\d{14}).*\.html)?/ ) {
+
+  my $event_label = "";
+  my $event_date = "";
+  my $event_month = "00";
+  my $event_day = "00";
+  my $event_year = "00";
+  my $event_hours = "00";
+  my $event_minutes = "00";
+  my $cy = param( "cy" );
+  my $cm = param( "cm" );
+  my $c = param( "c" );
+  my $d = param( "d" );
+
+  print qq~<a href="admin.cgi?edit=events&cy=$cy&cm=$cm&c=$c&d=$d">Events</a>~;
+  print "&nbsp;&#62;&nbsp;";
+  my $edit_event = 0;
+  if ( defined($1) && "" ne $1 ) {
+    $edit_event = 1;
+    print "Edit";
+  }
+  else { print "New"; }
+  print " Event:\n";
+
+  if ( 1 == $edit_event ) {
+
+    # GET EVENT PUBLISH DATE
+    my $event_date = $2;
+    $event_year = substr($event_date, 0, 4);
+    $event_month = substr($event_date, 4, 2);
+    $event_day = substr($event_date, 6, 2);
+    $event_hours = substr($event_date, 8, 2);
+    $event_minutes = substr($event_date, 10, 2);
+
+    open EVENT, $edit or die "Can't open EVENT $edit $!";
+
+    # GET EVENT LABEL
+    $event_label = <EVENT>;
+    chomp $event_label;
+    $event_label =~ s/^<!-- | -->//g;
+
+    my $dump = <EVENT>; # skip extra line
+  }
+
+  print qq~<form name="editevent" action="admin.cgi" method="post"
+             onSubmit="if ( document.forms.editevent.event_label.value == ''
+             ) { alert('Please enter an Event Link Label.'); 
+             document.forms.editevent.event_label.focus();
+             return false; } else { return true; }"
+           >\n~;
+  print qq~<input type="hidden" name="event_filename" value="$edit" />\n~;
+  print qq~<input type="hidden" name="edit" value="events" />\n~;
+  print qq~<input type="hidden" name="cy" value="$cy" />\n~;
+  print qq~<input type="hidden" name="cm" value="$cm" />\n~;
+  print qq~<input type="hidden" name="c" value="$c" />\n~;
+  print qq~<input type="hidden" name="d" value="$d" />\n~;
+
+  # EVENT PUBLISH DATE
+  print "<p>\n";
+  print "Event Date:<br />";
+  print qq~<select name="event_month">\n~;
+  for (my $i = 1; $i < 13; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $event_month && $event_month == $i) 
+      || (0 == $event_month && $now_month == $i) 
+    ) { print " selected"; }
+    print ">" . $months[$i] . "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="event_day">\n~;
+  for (my $i = 1; $i < 32; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $event_day && $event_day == $i) 
+      || (0 == $event_day && $now_day == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="event_year">\n~;
+  for (my $i = ($now_year - 1); $i < $now_year + 4; $i++ ) {
+    print qq~<option value="$i"~;
+    if ( (0 < $event_year && $event_year == $i) 
+      || (0 == $event_year && $now_year == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~&nbsp;&nbsp;Time: (optional) <select name="event_hours">\n~;
+  print qq~<option value="00">Midnight</option>~;
+  for (my $i = 1; $i < 24; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( 0 < $event_hours && $event_hours == $i ) { print " selected"; }
+    print ">";
+    if ( 12 == $i ) { print "Noon"; }
+    elsif ( 13 > $i  ) { print "$i am"; }
+    else { print $i - 12, " pm"; }
+    print "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~:<select name="event_minutes">\n~;
+  print qq~<option value="00">00</option>~;
+  for (my $i = 15; $i < 46; $i += 15 ) {
+    print qq~<option value="$i"~;
+    if ( 0 < $event_minutes && $event_minutes == $i ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+
+  # EVENT LABEL
+  print "<p>\n";
+  print "Event Link Label:<br />";
+  print qq~<input type="text" name="event_label" size="60" value="~;
+  print $event_label;
+  print qq~" />\n~;
+  print "</p>\n";
+
+  # GET EVENT
+  print "<p>\n";
+  print "Event:<br />";
+  print qq~<textarea name="event" cols="60" rows="15">\n~;
+  if ( 1 == $edit_event ) {
+    while(<EVENT>) {
+      $_ =~ s/<br \/>//;
+      print $_;
+    }
+  }
+  print "</textarea>\n";
+  print "</p>\n";
+
+  # SUBMIT BUTTON
+  print "<p>\n";
+  print qq~<input type="submit" name="submit_action" value="Save Event" />\n~;
+  print qq~&nbsp;<input type="submit" name="submit_action" value="DELETE Event" onClick="return confirm('You are about to DELETE this event.');" />\n~ if 1 == $edit_event;
+  print "</p>\n";
+
+  close EVENT if 1 == $edit_event;
+  print "</form>\n";
+}
+
+
+
+
+
+
+
+# PAGES
+elsif ( "pages" eq $edit ) {
+
+  # PROCESS PAGE FORM
+  if ( defined(param( "submit_action" ))
+    && defined(param( "page_filename" ))
+    && "" ne param( "page_filename" )
+    && defined(param( "page_label" ))
+    && "" ne param( "page_label" )
+    && defined(param( "page_content" ))
+  ) {
+
+    my $category_ord = param( "category_ord" );
+    my $page_ord = param( "page_ord" );
+    my $category = param( "category_list" );
+    $category = param( "category" ) if "new" eq param( "category_list" );
+    my $page_label = param( "page_label" );
+    my $publish_date = param( "page_year" ) . param( "page_month" );
+    $publish_date .= param( "page_day" ) . param( "page_hours" );
+    $publish_date .= param( "page_minutes" ) . "00";
+    my $page_filename = param( "page_filename" );
+
+    # ARCHIVE OLD PAGE FILE
+    if ( $page_filename =~ /^pages_.+/ ) {
+      use File::Copy;
+      copy $page_filename, $page_filename . ".bak";
+      unlink $page_filename;
+    }
+
+    # REWRITE PAGE FILENAME
+    if ( "Save Page" eq param( "submit_action" ) ) {
+      $page_filename = $page_label;
+      $page_filename =~ s/ +/_/g;
+      $page_filename =~ s/\W//g;
+      $page_filename =~ s/(.+)/\L$1/;
+      $page_filename = "pages_" . $page_filename . ".html";
+      my $page_content = param( "page_content" );
+      $page_content =~ s/\r\n/<br \/>\n/g;
+
+      open PAGE, ">$page_filename" or die "Can't open PAGE $page_filename $!";
+      print PAGE "<!-- ", $category_ord, " -->\n";
+      print PAGE "<!-- ", $page_ord, " -->\n";
+      print PAGE "<!-- ", $category, " -->\n";
+      print PAGE "<!-- ", $page_label, " -->\n";
+      print PAGE "<!-- ", $publish_date, " -->\n\n";
+      print PAGE $page_content;
+      close PAGE;
+    }
+  }
+
+
+  opendir PAGES, "." or die "Can't open PAGES $!";
+  my @pages = grep /^pages_.+\.html(?!\.bak)/, readdir PAGES;
+  closedir PAGES;
+
+  my @pages_info = ();
+  foreach ( @pages ) {
+    open PAGE, "./$_" or die "Can't open PAGE $_ $!";
+
+    # GET CATEGORY ORD
+    my $cat_ord = <PAGE>;
+    chomp $cat_ord;
+    $cat_ord =~ s/(^<!-- | -->)//g;
+
+    # GET PAGE ORD
+    my $ord =  <PAGE>;
+    chomp $ord;
+    $ord =~ s/(^<!-- | -->)//g;
+
+    # GET CATEGORY
+    my $category = <PAGE>;
+    chomp $category;
+    $category =~ s/(^<!-- | -->)//g;
+
+    # GET LABEL
+    my $label =  <PAGE>;
+    chomp $label;
+    $label =~ s/(^<!-- | -->)//g;
+
+    # GET PUBLISH DATE
+    my $publish_date =  <PAGE>;
+    chomp $publish_date;
+    $publish_date =~ s/(^<!-- | -->)//g;
+
+    close PAGE;
+
+    # GET LINK
+    my $link = $_;
+    chomp $link;
+    #$link =~ s/^pages_//;
+
+    push @pages_info, [$cat_ord, $ord, $category, $link, $label]; 
+  }
+
+  my @sorted_pages_info = 
+    sort { 
+      @{$a}[0] <=> @{$b}[0] or @{$a}[1] <=> @{$b}[1] 
+    } @pages_info;
+
+
+  print "Pages:";
+  print qq~&nbsp;&nbsp;<a href="admin.cgi?edit=pages_">New...</a><br /><br />\n~;
+
+  my $old_category = "";
+  my $delimiter = "";
+  foreach ( @sorted_pages_info ) {
+
+    # PRINT PAGES
+    if ( $old_category ne ${$_}[2] ) {
+      print $delimiter, qq~  <div class="pages" id="pages_${$_}[0]">\n~;
+      if ( "" ne ${$_}[2] ) {
+      print qq~    <div class="pagescategory">~;
+        print ${$_}[2], "</div>\n";
+      }
+      print "    <ul>\n";
+      $delimiter = "    </ul>\n  </div>\n\n";
+      $old_category = ${$_}[2];
+    }
+    print "      <li>";
+    print qq~<a class="pagelink"~;
+    print qq~ href="admin.cgi?edit=~, ${$_}[3], qq~">~;
+    print ${$_}[4];
+    print "</a>";
+    print "</li>\n";
+  }
+  print "    </ul>\n";
+  print "  </div>\n";
+}
+
+
+
+
+
+
+
+
+# EDIT PAGE
+elsif ( $edit =~ /^pages_(.+\.html)?/ ) {
+
+  print qq~<a href="admin.cgi?edit=pages">Pages</a>~;
+  print "&nbsp;&#62;&nbsp;";
+  my $edit_page = 0;
+  if ( defined($1) && "" ne $1 ) {
+    $edit_page = 1;
+    print "Edit";
+  }
+  else { print "New"; }
+  print " Page:\n";
+
+  my $category_ord = "";
+  my $page_ord = "";
+  my $category = "";
+  my $page_label = "";
+  my $publish_date = "";
+  my $page_date = "";
+  my $category_count = 0;
+  my $page_count = 0;
+  my $page_month = "00";
+  my $page_day = "00";
+  my $page_year = "00";
+  my $page_hours = "00";
+  my $page_minutes = "00";
+
+  # GET CATEGORIES
+  opendir PAGES, "." or die "Can't open PAGES $!";
+  my @pages = grep /^pages_.+\.html(?!\.bak)/, readdir PAGES;
+  closedir PAGES;
+
+  my %categories = ();
+  foreach ( @pages ) {
+    open PAGE, "./$_" or die "Can't open PAGE $_ $!";
+
+    # GET CATEGORY
+    my $category_ord = <PAGE>;
+    $category_ord =~ s/(^<!-- | -->)//g;
+    chomp $category_ord;
+    my $category = <PAGE>;
+    $category = <PAGE>;
+    chomp $category;
+    $category =~ s/(^<!-- | -->)//g;
+
+    close PAGE;
+    $categories{$category} = [$category, $category_ord];
+    $page_count++;
+  }
+  my @categories = ();
+  foreach ( keys %categories ) {;
+    push @categories, [$categories{$_}[0], $categories{$_}[1]];
+    $category_count++;
+  }
+  @categories = sort { ${$a}[1] cmp ${$b}[1] } @categories;
+
+  if ( 1 == $edit_page ) {
+
+    open PAGE, $edit or die "Can't open PAGE $edit $!";
+
+    # GET CATEGORY ORD
+    $category_ord = <PAGE>;
+    chomp $category_ord;
+    $category_ord =~ s/^<!-- | -->//g;
+
+    # GET PAGE ORD
+    $page_ord = <PAGE>;
+    chomp $page_ord;
+    $page_ord =~ s/^<!-- | -->//g;
+
+    # GET CATEGORY
+    $category = <PAGE>;
+    chomp $category;
+    $category =~ s/^<!-- | -->//g;
+
+    # GET PAGE LABEL
+    $page_label = <PAGE>;
+    chomp $page_label;
+    $page_label =~ s/^<!-- | -->//g;
+
+    # GET PUBLISH DATE
+    $publish_date = <PAGE>;
+    chomp $publish_date;
+    $publish_date =~ s/^<!-- | -->//g;
+
+    # GET PAGE PUBLISH DATE
+    $page_year = substr($publish_date, 0, 4);
+    $page_month = substr($publish_date, 4, 2);
+    $page_day = substr($publish_date, 6, 2);
+    $page_hours = substr($publish_date, 8, 2);
+    $page_minutes = substr($publish_date, 10, 2);
+
+    my $dump = <PAGE>; # skip extra line
+  }
+
+  print qq~<form name="editpage" action="admin.cgi" method="post"
+             onSubmit="if ( document.forms.editpage.page_label.value == ''
+             ) { alert('Please enter an Page Link Label.'); 
+             document.forms.editpage.page_label.focus();
+             return false; } else { return true; }"
+           >\n~;
+  print qq~<input type="hidden" name="page_filename" value="$edit" />\n~;
+  print qq~<input type="hidden" name="edit" value="pages" />\n~;
+
+  # PAGE PUBLISH DATE
+  print "<p>\n";
+  print "Page Publish Date:<br />";
+  print qq~<select name="page_month">\n~;
+  for (my $i = 1; $i < 13; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $page_month && $page_month == $i) 
+      || (0 == $page_month && $now_month == $i) 
+    ) { print " selected"; }
+    print ">" . $months[$i] . "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="page_day">\n~;
+  for (my $i = 1; $i < 32; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( (0 < $page_day && $page_day == $i) 
+      || (0 == $page_day && $now_day == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~<select name="page_year">\n~;
+  for (my $i = ($now_year - 1); $i < $now_year + 4; $i++ ) {
+    print qq~<option value="$i"~;
+    if ( (0 < $page_year && $page_year == $i) 
+      || (0 == $page_year && $now_year == $i)
+    ) { print " selected"; }
+    print ">$i</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~&nbsp;&nbsp;Time: (optional) <select name="page_hours">\n~;
+  print qq~<option value="00">Midnight</option>~;
+  for (my $i = 1; $i < 24; $i++ ) {
+    print qq~<option value="~;
+    print "0" if 10 > $i;
+    print qq~$i"~;
+    if ( 0 < $page_hours && $page_hours == $i ) { print " selected"; }
+    print ">";
+    if ( 12 == $i ) { print "Noon"; }
+    elsif ( 13 > $i  ) { print "$i am"; }
+    else { print $i - 12, " pm"; }
+    print "</option>\n";
+
+  }
+  print "</select>\n";
+  print qq~:<select name="page_minutes">\n~;
+  print qq~<option value="00">00</option>~;
+  for (my $i = 15; $i < 46; $i += 15 ) {
+    print qq~<option value="$i"~;
+    if ( 0 < $page_minutes && $page_minutes == $i ) { print " selected"; }
+    print ">$i</option>\n";
+  }
+  print "</select>\n";
+
+  # CATEGORY
+  print "<p>\n";
+  print "Category:<br />";
+  print qq~<select name="category_list" width="200px" style="width: 200px;">\n~;
+  print qq~<option value=""></option>~;
+  foreach ( @categories ) {
+    print qq~<option value="~ . ${$_}[0] . qq~"~;
+    if ( $category eq ${$_}[0] ) { print " selected"; }
+    print ">" , ${$_}[0] , "</option>\n";
+  }
+  print qq~<option value="new">New Category</option>~;
+  print "</select>\n";
+  print qq~<input type="text" name="category" size="30" value="~;
+  #print $category;
+  print qq~" />\n~;
+  print "</p>\n";
+
+  # CATEGORY ORD
+  print "<p>\n";
+  print "Category Order:&nbsp;&nbsp;";
+  print qq~<select name="category_ord">\n~;
+  for (my $i = 1; $i < $category_count + 2; $i++ ) {
+    print qq~<option value="$i"~;
+    if ( $category_ord == $i ) { print " selected"; }
+    print ">$i</option>\n";
+  }
+  print "</select>\n";
+
+  # PAGE ORD
+  print "&nbsp;&nbsp;&nbsp;&nbsp;Page Order:&nbsp;&nbsp;";
+  print qq~<select name="page_ord">\n~;
+  my $i = 0;
+  for ($i = 1; $i < $page_count + 1; $i++ ) {
+    print qq~  <option value="$i"~;
+    if ( $page_ord == $i ) { print " selected"; }
+    print ">$i</option>\n";
+  }
+  print qq~  <option value="$i">$i</option>\n~ if 1 > $edit_page;
+  print "</select>\n";
+  print "</p>\n";
+
+  # PAGE LABEL
+  print "<p>\n";
+  print "Page Link Label:<br />";
+  print qq~<input type="text" name="page_label" size="60" value="~;
+  print $page_label;
+  print qq~" />\n~;
+  print "</p>\n";
+
+  # GET PAGE
+  print "<p>\n";
+  print "Page Content:<br />";
+  print qq~<textarea name="page_content" cols="60" rows="15">\n~;
+  if ( 1 == $edit_page ) {
+    while(<PAGE>) {
+      $_ =~ s/<br \/>//;
+      print $_;
+    }
+  }
+  print "</textarea>\n";
+  print "</p>\n";
+
+  # SUBMIT BUTTON
+  print "<p>\n";
+  print qq~<input type="submit" name="submit_action" value="Save Page" />\n~;
+  print qq~&nbsp;<input type="submit" name="submit_action" value="DELETE Page" onClick="return confirm('You are about to DELETE this page.');" />\n~ if 1 == $edit_page;
+  print "</p>\n";
+
+  close PAGE if 1 == $edit_page;
+  print "</form>\n";
+}
